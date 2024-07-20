@@ -1,21 +1,21 @@
 {
-  "kind": "unreal_engine",
-  "name": "new gen",
-  "description": "game engine 3",
-  "version": "0.3.1",
+  "kind": "something",
+  "name": "unnamed",
+  "description": "text text text",
+  "version": "0.1.4",
   "configuration": {
     "specification": {
-      "spec_a": "1 spec",
-      "spec_b": "2 spec",
-      "spec_c": "3 spec",
-      "spec_d": "4 spec"
+      "spec_a": "aa",
+      "spec_b": "bb",
+      "spec_c": "cc",
+      "spec_d": "dd"
     },
     "settings": {
-      "setting_a": "jinja",
-      "setting_b": "rtx",
+      "setting_a": "qwerty",
+      "setting_b": "asdfg",
       "nested_setting": {
-        "aaa": "000",
-        "aab": "999"
+        "aaa": 10000,
+        "aab": 124.24
       }
     }
   }

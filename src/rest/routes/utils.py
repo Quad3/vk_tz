@@ -6,8 +6,8 @@ import json
 from models import Apps, State
 
 
-async def get_kind(uuid: UUID, db: Session):
-    kind = db.query(Apps).filter(Apps.uuid == uuid).first()
+async def get_kind(uuid: UUID, kind_name: str, db: Session):
+    kind = db.query(Apps).filter(Apps.uuid == uuid, Apps.kind == kind_name).first()
     if kind and isinstance(kind.json, str):
         kind.json = json.loads(kind.json)
 

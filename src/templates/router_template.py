@@ -17,6 +17,7 @@ router = APIRouter(
     prefix="/{{ kind }}",
     tags=["{{ kind }}"]
 )
+KIND_NAME = {{ kind }}
 
 
 @router.post("", status_code=201, response_model=uuid_pkg.UUID)
@@ -30,6 +31,9 @@ async def create_kind(file: Annotated[bytes, File()], db: Session = Depends(get_
         )
 
     kind_model_dict = kind_model.dict()
+    if kind_model_dict["kind"] != KIND_NAME:
+        raise HTTPException(status_code=422, detail="Not valid")
+
     kind_model_dict.pop("configuration")
 
     new_kind = Apps(**kind_model_dict)
@@ -57,7 +61,9 @@ async def update_kind_configuration(uuid: str, configuration: Configuration, db:
             content=jsonable_encoder({"detail": exc.errors()})
         )
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
 
     kind.json['configuration']['settings'] = update_configuration_encoded["settings"]
     kind.json['configuration']['specification'] = update_configuration_encoded["specification"]
@@ -86,7 +92,9 @@ async def update_kind_settings(uuid: str, settings: Settings, db: Session = Depe
             content=jsonable_encoder({"detail": exc.errors()})
         )
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
 
     kind.json['configuration']['settings'] = update_settings_encoded
 
@@ -105,7 +113,7 @@ async def update_kind_settings(uuid: str, settings: Settings, db: Session = Depe
 @router.put("/{uuid}/state", response_model=State)
 async def update_kind_state(uuid: str, state: State, db: Session = Depends(get_db)):
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
     if kind is None:
         raise HTTPException(status_code=404, detail="Does not exist")
 
@@ -117,7 +125,7 @@ async def update_kind_state(uuid: str, state: State, db: Session = Depends(get_d
 @router.delete("/{uuid}")
 async def delete_kind(uuid: str, db: Session = Depends(get_db)) -> None:
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
     if kind is None:
         raise HTTPException(status_code=404, detail="Does not exist")
 
@@ -129,7 +137,7 @@ async def delete_kind(uuid: str, db: Session = Depends(get_db)) -> None:
 @router.get("/{uuid}", response_model=Kind_model)
 async def get_kind(uuid: str, db: Session = Depends(get_db)):
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
     if kind is None:
         raise HTTPException(status_code=404, detail="Does not exist")
 
@@ -145,7 +153,7 @@ async def get_kind(uuid: str, db: Session = Depends(get_db)):
 @router.get("/{uuid}/state", response_model=State)
 async def get_kind_state(uuid: str, db: Session = Depends(get_db)):
 
-    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db, kind_name=KIND_NAME)
     if kind is None:
         raise HTTPException(status_code=404, detail="Does not exist")
 

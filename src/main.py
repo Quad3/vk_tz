@@ -9,7 +9,7 @@ app = FastAPI(
 )
 
 
-routers: str = get_router_names()
+routers: list[str] = get_router_names()
 
 for router in routers:
     globals()[router] = importlib.import_module(f"rest.routes.{router}.router")

@@ -1,6 +1,8 @@
 import enum
-from sqlalchemy import MetaData, Table, Column, JSON, String, UUID
+from sqlalchemy import MetaData,Column, JSON, String, UUID
 from sqlalchemy.types import Enum
+
+from database import Base
 
 
 metadata = MetaData()
@@ -12,14 +14,13 @@ class State(str, enum.Enum):
     RUNNING = "RUNNING"
 
 
-apps = Table(
-    "apps",
-    metadata,
-    Column("uuid", UUID, primary_key=True),
-    Column("kind", String, nullable=False),
-    Column("name", String, nullable=False),
-    Column("version", String, nullable=False),
-    Column("description", String),
-    Column("state", Enum(State), default="NEW"),
-    Column("json", JSON, nullable=False),
-)
+class Apps(Base):
+    __tablename__ = "apps"
+
+    uuid = Column(UUID, primary_key=True)
+    kind = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    version = Column(String, nullable=False)
+    description = Column(String)
+    state = Column(Enum(State), default="NEW")
+    json = Column(JSON, nullable=False)

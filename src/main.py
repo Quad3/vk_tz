@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 
+from rest.routes.something.router import router
 
 app = FastAPI(
-    title="VK tz"
+    title="something"
 )
 
-
-@app.get("/")
-def home():
-    return {"status": "success"}
+app.include_router(router)

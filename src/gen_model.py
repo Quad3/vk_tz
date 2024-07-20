@@ -8,7 +8,7 @@ def gen_model(filename: str) -> None:
         data = json.load(f)
 
         try:
-            os.mkdir(f"rest/models/{data['kind']}")
+            os.makedirs(f"rest/models/{data['kind']}", exist_ok=True)
         except OSError as error:
             print(error)
 

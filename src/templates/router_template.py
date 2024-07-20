@@ -2,15 +2,15 @@ import uuid as uuid_pkg
 import json
 
 from typing import Annotated
-from fastapi import APIRouter, Depends, File, status
+from fastapi import APIRouter, Depends, File, status, HTTPException
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import insert, select, update, delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
-from database import get_async_session
+from database import get_db
 
 from rest.models.{{ kind }}.model import Model as Kind_model, Configuration, Settings, Specification
-from models import apps, State
+from models import Apps, State
+from rest.routes import utils
 
 
 router = APIRouter(
@@ -20,137 +20,133 @@ router = APIRouter(
 
 
 @router.post("", status_code=201, response_model=uuid_pkg.UUID)
-async def create_kind(file: Annotated[bytes, File()], session: AsyncSession = Depends(get_async_session)):
+async def create_kind(file: Annotated[bytes, File()], db: Session = Depends(get_db)):
     try:
-        kind_model = Kind_model.model_validate_json(file)
+        kind_model = Kind_model.parse_raw(file)
     except Exception as exc:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=jsonable_encoder({"detail": exc.errors()})
         )
 
-    new_kind = kind_model.dict()
-    new_kind["uuid"] = uuid_pkg.uuid4()
+    kind_model_dict = kind_model.dict()
+    kind_model_dict.pop("configuration")
 
-    file = json.loads(file)
-    new_kind["json"] = file
+    new_kind = Apps(**kind_model_dict)
+    new_kind.uuid = uuid_pkg.uuid4()
 
-    response_object = new_kind.copy()
-    response_object.pop("json")
-    new_kind.pop("configuration")
+    new_kind.json = json.loads(file)
 
-    stmt = insert(apps).values(new_kind)
-    await session.execute(stmt)
-    await session.commit()
+    db.add(new_kind)
+    db.commit()
 
-    return new_kind["uuid"]
+    return new_kind.uuid
 
 
 @router.put("/{uuid}/configuration", response_model=Kind_model)
-async def update_kind_configuration(
-        uuid: str, configuration: Configuration, session: AsyncSession = Depends(get_async_session)):
+async def update_kind_configuration(uuid: str, configuration: Configuration, db: Session = Depends(get_db)):
 
     update_configuration_encoded = jsonable_encoder(configuration)
 
     try:
-        Settings.model_validate(update_configuration_encoded["settings"])
-        Specification.model_validate(update_configuration_encoded["specification"])
+        Settings.parse_obj(update_configuration_encoded["settings"])
+        Specification.parse_obj(update_configuration_encoded["specification"])
     except Exception as exc:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=jsonable_encoder({"detail": exc.errors()})
         )
 
-    query = select(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid))
-    result = await session.execute(query)
-    result = result.first()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
 
-    db_json = result[6]
-    db_json['configuration']['settings'] = update_configuration_encoded["settings"]
-    db_json['configuration']['specification'] = update_configuration_encoded["specification"]
+    kind.json['configuration']['settings'] = update_configuration_encoded["settings"]
+    kind.json['configuration']['specification'] = update_configuration_encoded["specification"]
 
-    update_stmt = update(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid)).values(json=db_json)
-    await session.execute(update_stmt)
-    await session.commit()
+    kind = await utils.update_kind(new_kind=kind, db=db)
 
-    return Kind_model(kind=result[1],
-                      name=result[2],
-                      version=result[3],
-                      configuration=db_json["configuration"],
-                      description=result[4])
+    return {
+        "kind": kind.kind,
+        "name": kind.name,
+        "description": kind.description,
+        "version": kind.version,
+        "configuration": kind.json["configuration"]
+    }
 
 
 @router.put("/{uuid}/settings", response_model=Kind_model)
-async def update_kind_settings(uuid: str, settings: Settings, session: AsyncSession = Depends(get_async_session)):
+async def update_kind_settings(uuid: str, settings: Settings, db: Session = Depends(get_db)):
+
     update_settings_encoded = jsonable_encoder(settings)
 
     try:
-        Settings.model_validate(update_settings_encoded)
+        Settings.parse_obj(update_settings_encoded)
     except Exception as exc:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=jsonable_encoder({"detail": exc.errors()})
         )
 
-    query = select(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid))
-    result = await session.execute(query)
-    result = result.first()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
 
-    db_json = result[6]
-    db_json['configuration']['settings'] = update_settings_encoded
+    kind.json['configuration']['settings'] = update_settings_encoded
 
-    update_stmt = update(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid)).values(json=db_json)
-    await session.execute(update_stmt)
-    await session.commit()
+    kind = await utils.update_kind(new_kind=kind, db=db)
+    kind.configuration = kind.json["configuration"]
 
-    return Kind_model(kind=result[1],
-                      name=result[2],
-                      version=result[3],
-                      configuration=db_json["configuration"],
-                      description=result[4])
+    return {
+        "kind": kind.kind,
+        "name": kind.name,
+        "description": kind.description,
+        "version": kind.version,
+        "configuration": kind.json["configuration"]
+    }
 
 
 @router.put("/{uuid}/state", response_model=State)
-async def update_kind_state(uuid: str, state: State, session: AsyncSession = Depends(get_async_session)):
+async def update_kind_state(uuid: str, state: State, db: Session = Depends(get_db)):
 
-    update_stmt = update(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid)).values(state=state)
-    await session.execute(update_stmt)
-    await session.commit()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
 
-    return state
+    new_state = await utils.update_kind_state(kind=kind, new_state=state, db=db)
+
+    return new_state
 
 
 @router.delete("/{uuid}")
-async def delete_kind(uuid: str, session: AsyncSession = Depends(get_async_session)) -> None:
+async def delete_kind(uuid: str, db: Session = Depends(get_db)) -> None:
 
-    stmt = delete(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid))
-    await session.execute(stmt)
-    await session.commit()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
+
+    await utils.delete_kind(kind=kind, db=db)
 
     return None
 
 
 @router.get("/{uuid}", response_model=Kind_model)
-async def get_kind(uuid: str, session: AsyncSession = Depends(get_async_session)):
+async def get_kind(uuid: str, db: Session = Depends(get_db)):
 
-    query = select(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid))
-    result = await session.execute(query)
-    result = result.first()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
 
-    return Kind_model(kind=result[1],
-                      name=result[2],
-                      version=result[3],
-                      configuration=result[6]["configuration"],
-                      description=result[4])
+    return {
+        "kind": kind.kind,
+        "name": kind.name,
+        "description": kind.description,
+        "version": kind.version,
+        "configuration": kind.json["configuration"]
+    }
 
 
 @router.get("/{uuid}/state", response_model=State)
-async def get_kind_state(uuid: str, session: AsyncSession = Depends(get_async_session)):
+async def get_kind_state(uuid: str, db: Session = Depends(get_db)):
 
-    query = select(apps).where(apps.c.uuid == uuid_pkg.UUID(uuid))
-    result = await session.execute(query)
-    result = result.first()
+    kind = await utils.get_kind(uuid=uuid_pkg.UUID(uuid), db=db)
+    if kind is None:
+        raise HTTPException(status_code=404, detail="Does not exist")
 
-    state = result[5]
-
-    return state
+    return kind.state

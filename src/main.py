@@ -1,9 +1,16 @@
+import importlib
 from fastapi import FastAPI
 
-from rest.routes.something.router import router
+from services import get_router_names
+
 
 app = FastAPI(
-    title="something"
+    title="JSON parser"
 )
 
-app.include_router(router)
+
+routers: str = get_router_names()
+
+for router in routers:
+    globals()[router] = importlib.import_module(f"rest.routes.{router}.router")
+    app.include_router(globals()[router].router)

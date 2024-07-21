@@ -17,7 +17,7 @@ router = APIRouter(
     prefix="/{{ kind }}",
     tags=["{{ kind }}"]
 )
-KIND_NAME = {{ kind }}
+KIND_NAME = "{{ kind }}"
 
 
 @router.post("", status_code=201, response_model=uuid_pkg.UUID)

@@ -1,7 +1,7 @@
 import importlib
 from fastapi import FastAPI
 
-from services import get_router_names
+from utils import get_router_names
 
 
 app = FastAPI(

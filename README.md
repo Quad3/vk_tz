@@ -36,9 +36,9 @@ Add kind
 
 `gen_router.py` generates FastAPI controllers
 - POST:/{kind}/
-- PUT:/{kind}/{uuid}/{configuration}/
-- PUT:/{kind}/{uuid}/{settings}/
-- PUT:/{kind}/{uuid}/{state}/
+- PUT:/{kind}/{uuid}/configuration/
+- PUT:/{kind}/{uuid}/settings/
+- PUT:/{kind}/{uuid}/state/
 - DELETE:/{kind}/{uuid}/
 - GET:/{kind}/{uuid}/
 - GET:/{kind}/{uuid}/state/
